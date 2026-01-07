@@ -2,8 +2,12 @@ package org.example.onebyte.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "boards")
@@ -17,13 +21,27 @@ public class Board {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // FK: categorys.id (DDL상 테이블명 categorys지만 컬럼은 category_id)
-    @Column(name = "category_id", nullable = false)
-    private Long categoryId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+            name = "category_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_boards_category")
+    )
+    private Category category;
 
-    // FK: users.id
+    @OneToMany(
+            mappedBy = "board",
+            cascade = CascadeType.REMOVE,
+            orphanRemoval = true
+    )
+    @Builder.Default
+    private List<Comment> comments = new ArrayList<>();
+
     @Column(name = "user_id", nullable = false)
     private Long userId;
+
+    @Column(name = "user_nickname", nullable = false, length = 50)
+    private String userNickname;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -33,35 +51,49 @@ public class Board {
     private String content;
 
     @Column(name = "view_count", nullable = false)
-    private Long viewCount;
+    @Builder.Default
+    private Long viewCount = 0L;
 
-    // DB에서 DEFAULT CURRENT_TIMESTAMP로 자동 세팅
-    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
+    @Column(name = "comment_count", nullable = false)
+    @Builder.Default
+    private Long commentCount = 0L;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    // DB에서 ON UPDATE CURRENT_TIMESTAMP로 자동 갱신
-    @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public static Board create(Long categoryId, Long userId, String title, String content) {
+    public static Board create(Category category, Long userId, String userNickname, String title, String content) {
         return Board.builder()
-                .categoryId(categoryId)
+                .category(category)
                 .userId(userId)
+                .userNickname(userNickname)
                 .title(title)
                 .content(content)
                 .viewCount(0L)
+                .commentCount(0L)
                 .build();
     }
 
-    public void update(Long categoryId, String title, String content) {
-        this.categoryId = categoryId;
+    public void update(Category category, String title, String content) {
+        this.category = category;
         this.title = title;
         this.content = content;
     }
 
-
-    // 추후 개발
     public void increaseViewCount() {
         this.viewCount = (this.viewCount == null ? 0L : this.viewCount) + 1L;
+    }
+
+    public void increaseCommentCount() {
+        this.commentCount = (this.commentCount == null ? 0L : this.commentCount) + 1L;
+    }
+
+    public void decreaseCommentCount() {
+        long cur = (this.commentCount == null ? 0L : this.commentCount);
+        this.commentCount = Math.max(0L, cur - 1L);
     }
 }

@@ -18,6 +18,7 @@ jwt:
   refreshKey: adf2131asap1sa231231disf4535345356757asdasdasd2313242dgfglknlnibkjlknblkjn3123vclqjekjr3
   access-expiration-time: 1800000 # 30분
   fresh-expiration-time: 86400000 # 1일
+#  access-expiration-time: 10000 # 30분
 
 logging:
   level:

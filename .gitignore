@@ -1,0 +1,13 @@
+
+# frontend
+onebyte/CodeForest/node_modules/
+onebyte/CodeForest/.vite/
+onebyte/CodeForest/dist/
+onebyte/CodeForest/.env
+onebyte/CodeForest/.env.*
+onebyte/CodeForest/node_modules/
+onebyte/CodeForest/.vite/
+onebyte/CodeForest/dist/
+onebyte/CodeForest/.env
+onebyte/CodeForest/.env.*
+onebyte_test_frontend/

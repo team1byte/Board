@@ -47,13 +47,14 @@ public class GlobalExceptionHandler {
     }
 
     //DB유니크 제약 위반 (409 : 서버충돌)
-    //중복 2치 ㅊ[ㅋ,
+    //중복 2차 체크
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(
             DataIntegrityViolationException e,
             HttpServletRequest request
     ) {
         log.warn("DB constraint violation: {}", e.getMessage());
+        log.warn("DB constraint violation: {}", e.getMostSpecificCause().getMessage());
 
         ErrorResponse body = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
@@ -160,6 +161,23 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(
+            ConflictException e,
+            HttpServletRequest request
+    ) {
+        ErrorResponse body = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(e.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
 //
 //
 //    @ExceptionHandler(GlobalExceptionHandler.class)

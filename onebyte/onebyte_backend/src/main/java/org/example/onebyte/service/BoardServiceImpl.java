@@ -4,10 +4,12 @@ import lombok.RequiredArgsConstructor;
 import org.example.onebyte.dto.board.BoardRequest;
 import org.example.onebyte.dto.board.BoardResponse;
 import org.example.onebyte.entity.Board;
+import org.example.onebyte.entity.Category;
 import org.example.onebyte.entity.User;
 import org.example.onebyte.exception.PostNotFoundException;
 import org.example.onebyte.repository.BoardRepository;
 import org.example.onebyte.repository.UserRepository;
+import org.example.onebyte.repository.category.CategoryRepository;
 import org.example.onebyte.type.Role;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +26,7 @@ public class BoardServiceImpl implements BoardService {
 
     private final BoardRepository boardRepository;
     private final UserRepository userRepository;
+    private final CategoryRepository categoryRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -37,11 +40,14 @@ public class BoardServiceImpl implements BoardService {
 
     @Override
     public BoardResponse findByBoardId(Long boardId) {
+        boardRepository.increaseViewCount(boardId);
+
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("게시글이 존재하지 않습니다."));
 
         return BoardResponse.from(board);
     }
+
 
     // 카테고리 별 게시글 조회
     public Page<BoardResponse> getBoardsByCategory(Long categoryId, Pageable pageable){
@@ -82,16 +88,26 @@ public class BoardServiceImpl implements BoardService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("유저가 없습니다. id=" + userId));
 
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new IllegalArgumentException("카테고리를 찾을 수 없습니다."));
+
+        if (user.getNickname() == null || user.getNickname().isBlank()) {
+            throw new IllegalStateException("유저 닉네임이 비어있습니다. userId=" + userId);
+        }
+
         Board board = Board.builder()
-                .categoryId(request.categoryId())
+                .category(category)
                 .title(request.title())
                 .content(request.content())
                 .userId(user.getId())
+                .userNickname(user.getNickname())
                 .viewCount(0L)
+                .commentCount(0L)
                 .build();
 
         return BoardResponse.from(boardRepository.save(board));
     }
+
 
     @Override
     public BoardResponse update(Long boardId, Long userId, BoardRequest request) {
@@ -102,7 +118,10 @@ public class BoardServiceImpl implements BoardService {
             throw new AccessDeniedException("작성자만 수정할 수 있습니다.");
         }
 
-        board.update(request.categoryId(), request.title(), request.content());
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new IllegalArgumentException("카테고리를 찾을 수 없습니다."));
+
+        board.update(category, request.title(), request.content());
         return BoardResponse.from(board);
     }
 
@@ -123,5 +142,6 @@ public class BoardServiceImpl implements BoardService {
 
         boardRepository.delete(board);
     }
+
 
 }
