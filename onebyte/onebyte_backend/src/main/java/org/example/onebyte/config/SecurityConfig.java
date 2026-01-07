@@ -14,7 +14,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -34,24 +33,25 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // ✅ CORS 설정 (프론트 주소에 맞춰야 함)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // Vite 기본 포트: 5173 (너 프론트 주소가 다르면 여기 바꿔)
-        config.setAllowedOriginPatterns(List.of(
-            "http://localhost:5173",
-            "http://localhost:3000",
-            "http://44.220.167.111:3000",
-            "http://44.220.167.111" // 포트 없는 버전도 혹시 모르니 추가
+        config.setAllowedOrigins(List.of(
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://44.220.167.111:3000"
         ));
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
 
-        // Authorization 헤더 쓰면 보통 true가 편함(쿠키/세션 안 써도 상관 없음)
         config.setAllowCredentials(true);
+
+        // (선택) 프론트에서 Set-Cookie 같은 헤더가 필요하면 노출
+        config.setExposedHeaders(List.of("Set-Cookie"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
@@ -60,58 +60,44 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-
         JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtTokenizer);
 
         http
-                // Spring Security에서 CORS를 "실제로" 켬
-               .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
 
-                .authorizeHttpRequests(auth -> auth 
-                        .requestMatchers("/favicon.ico").permitAll()
-
-                        .requestMatchers("/stomp-test.html").permitAll()
-
-                        // CORS preflight (브라우저 OPTIONS) 무조건 허용
+                .authorizeHttpRequests(auth -> auth
+                        // preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // 인증 없이 접근 허용 (Auth)
+                        // auth endpoints
                         .requestMatchers(
                                 "/",
                                 "/error",
                                 "/api/users/register",
-                                "/api/users/login"
+                                "/api/users/login",
+                                "/api/users/reissue",
+                                "/ws-stomp/**"
                         ).permitAll()
 
-                        // 카테고리 조회는 누구나
+                        // public stats
+                        .requestMatchers(HttpMethod.GET, "/api/community").permitAll()
+
+                        // public read
                         .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
-
-                        // 게시글 조회는 누구나
                         .requestMatchers(HttpMethod.GET, "/api/boards/**").permitAll()
-
-                        // 댓글 조회는 누구나
-                        .requestMatchers(HttpMethod.GET, "/api/boards/*/comments/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/comments/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/boards/*/comments/**").permitAll()
 
-                        // 관리자 전용
-                        .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/categories/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/categories/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasAuthority("ROLE_ADMIN")
+                        // admin only
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                        // WebSocket 접근 허용
-                        .requestMatchers("/ws-stomp/**").permitAll()
-
-                        // 나머지는 로그인 필요
+                        // others need auth
                         .anyRequest().authenticated()
                 )
 
-                // JWT 필터 등록
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
